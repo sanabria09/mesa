@@ -561,17 +561,27 @@ function nextHand(){document.getElementById('overlay').classList.remove('show');
 function resetMatch(){score=[0,0];firstHand=true;document.getElementById('overlay').classList.remove('show');start();}
 
 /* ===================== RENDER ===================== */
-function pipHtml(v){
+function pipHtml(v,horiz){
+  // canonical (upright) pip layout on a 3x3 grid, indices row-major:
+  //  0 1 2
+  //  3 4 5
+  //  6 7 8
   const map={0:[],1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
-  const on=new Set(map[v]);
+  // a horizontally-laid tile is the upright tile rotated 90°, so rotate the pips too:
+  // the 6 becomes two horizontal rows of three, the 2/3 diagonals flip to match.
+  const ROT={0:2,1:5,2:8,3:1,4:4,5:7,6:0,7:3,8:6};
+  let idxs=map[v];
+  if(horiz) idxs=idxs.map(i=>ROT[i]);
+  const on=new Set(idxs);
   let s='<div class="pips">';
   for(let i=0;i<9;i++) s+=`<span class="${on.has(i)?'':'off'}"></span>`;
   return s+'</div>';
 }
 function tileNodeHTML(l,r,vertical){
+  const horiz=!vertical; // doubles render vertical (upright); everything else lies horizontal
   return `<div class="tile ${vertical?'v':'h'}">`+
-    `<div class="half" data-v="${l}">${pipHtml(l)}</div>`+
-    `<div class="half" data-v="${r}">${pipHtml(r)}</div></div>`;
+    `<div class="half" data-v="${l}">${pipHtml(l,horiz)}</div>`+
+    `<div class="half" data-v="${r}">${pipHtml(r,horiz)}</div></div>`;
 }
 function tileStr(t){return `[${t.a}|${t.b}]`;}
 
@@ -592,7 +602,7 @@ function renderHand(){
     const playable=myTurn&&canPlaySet.has(key);
     const div=document.createElement('div');
     div.className='hand-tile tile h'+(playable?' playable':'')+(myTurn&&!playable?' dead':'')+(selectedTile&&sameTile(selectedTile,t)?' sel':'');
-    div.innerHTML=`<div class="half" data-v="${t.a}">${pipHtml(t.a)}</div><div class="half" data-v="${t.b}">${pipHtml(t.b)}</div>`;
+    div.innerHTML=`<div class="half" data-v="${t.a}">${pipHtml(t.a,true)}</div><div class="half" data-v="${t.b}">${pipHtml(t.b,true)}</div>`;
     if(playable) div.onclick=()=>humanTrySelect(t);
     h.appendChild(div);
   });
