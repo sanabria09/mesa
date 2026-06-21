@@ -1,5 +1,5 @@
 /* Mesa — service worker. Caches all assets so the game works fully offline. */
-const CACHE = 'mesa-v1';
+const CACHE = 'mesa-v2';
 
 /* Same-origin assets that make up the app shell. */
 const CORE_ASSETS = [
