@@ -1,5 +1,5 @@
 /* Mesa — service worker. Caches all assets so the game works fully offline. */
-const CACHE = 'mesa-v2';
+const CACHE = 'mesa-v3';
 
 /* Same-origin assets that make up the app shell. */
 const CORE_ASSETS = [
@@ -28,28 +28,45 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-/* Cache-first, with runtime caching for everything else (e.g. Google Fonts).
-   This makes the app fully offline after the first online load. */
+/* Strategy:
+   - The page/app code (navigations + same-origin HTML) is NETWORK-FIRST, so when
+     you're online you always get the latest version, with the cache as an offline
+     fallback. This avoids the app getting "stuck" on an old cached build.
+   - Everything else (icons, fonts, etc.) is CACHE-FIRST with runtime caching, so
+     the app loads instantly and works fully offline after the first online load. */
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
 
+  const url = new URL(req.url);
+  const isHTML = req.mode === 'navigate' ||
+    (url.origin === self.location.origin && url.pathname.endsWith('.html'));
+
+  if (isHTML) {
+    // network-first
+    event.respondWith(
+      fetch(req)
+        .then((res) => {
+          const copy = res.clone();
+          caches.open(CACHE).then((cache) => cache.put(req, copy));
+          return res;
+        })
+        .catch(() => caches.match(req).then((c) => c || caches.match('./index.html')))
+    );
+    return;
+  }
+
+  // cache-first for everything else
   event.respondWith(
     caches.match(req).then((cached) => {
       if (cached) return cached;
-      return fetch(req)
-        .then((res) => {
-          // Cache successful basic/cors responses (and opaque font responses).
-          if (res && (res.ok || res.type === 'opaque')) {
-            const copy = res.clone();
-            caches.open(CACHE).then((cache) => cache.put(req, copy));
-          }
-          return res;
-        })
-        .catch(() => {
-          // Offline fallback: serve the app shell for navigations.
-          if (req.mode === 'navigate') return caches.match('./index.html');
-        });
+      return fetch(req).then((res) => {
+        if (res && (res.ok || res.type === 'opaque')) {
+          const copy = res.clone();
+          caches.open(CACHE).then((cache) => cache.put(req, copy));
+        }
+        return res;
+      });
     })
   );
 });
